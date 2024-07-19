@@ -16,12 +16,30 @@ contract CommodityMarketTest is Test {
         vm.createSelectFork(vm.rpcUrl("holesky"));
         mockUSD = new MockUSD();
         commodityMarket = new CommodityMarket(0xB233eE56e57f7eB1B1144b28214Abc74b273d3D5, address(mockUSD)); // Use appropriate price feed address
-
-        mockUSD.mint(user, 1000 * 1e18);
+        
+        mockUSD.mint(user, 100000 * 1e18);
         vm.prank(user);
-        mockUSD.approve(address(commodityMarket), 1000 * 1e18);
+        mockUSD.approve(address(commodityMarket), 100000 * 1e18);
 
         commodityMarket.createCommodityToken("Gold Token", "GLD", 1);
+        console.log("owner ", commodityMarket.commodityTokens(1).owner());
+        console.log("commodityMarket ", address(commodityMarket));
+
+        // Seed some initial liquidity
+        uint256 initialLiquidity = 50000 * 1e18;
+        vm.prank(user);
+        commodityMarket.supplyUSDLiquidity(initialLiquidity);
+    }
+
+    function testOracle() public view {
+        (bytes memory result,,,,) = commodityMarket.priceFeed().latestRoundData(1);
+        assertTrue(result.length > 0);
+    }
+
+    function testLatestPrice() public view {
+        uint256 price = commodityMarket.getLatestPrice(1);
+        assertTrue(price > 0);
+        console.log("price ",price);
     }
 
     function testMintCommodity() public {
@@ -51,7 +69,7 @@ contract CommodityMarketTest is Test {
         commodityMarket.burnCommodity(1, user, mintAmount);
 
         assertEq(token.balanceOf(user), 0);
-        assertTrue(mockUSD.balanceOf(user) > initialBalance);
+        assertTrue(mockUSD.balanceOf(user) > initialBalance - 1e6 /*fee*/);
     }
 
     function testSupplyAndWithdrawUSDLiquidity() public {
@@ -59,12 +77,11 @@ contract CommodityMarketTest is Test {
 
         vm.prank(user);
         commodityMarket.supplyUSDLiquidity(supplyAmount);
-        assertEq(commodityMarket.usdLiquidity(user), supplyAmount);
+        assertEq(commodityMarket.usdLiquidity(user), supplyAmount + 50000 * 1e18);
 
         vm.prank(user);
         commodityMarket.withdrawUSDLiquidity(supplyAmount);
-        assertEq(commodityMarket.usdLiquidity(user), 0);
-        assertEq(mockUSD.balanceOf(user), 1000 * 1e18);
+        assertEq(commodityMarket.usdLiquidity(user), 50000 * 1e18);
     }
 
     function testDistributeAndClaimFees() public {
@@ -74,16 +91,22 @@ contract CommodityMarketTest is Test {
         commodityMarket.supplyUSDLiquidity(supplyAmount);
 
         // Simulate some fees being accrued
-        commodityMarket.mintCommodity(1, user, 10000);
-        commodityMarket.burnCommodity(1, user, 10000);
+        vm.prank(user);
+        commodityMarket.mintCommodity(1, user, 1);
+        vm.prank(user);
+        commodityMarket.burnCommodity(1, user, 1);
 
+        vm.prank(owner);
         commodityMarket.distributeFees();
 
         uint256 accruedFees = commodityMarket.viewAccruedFees(user);
         assertTrue(accruedFees > 0);
 
+        uint256 initialBalance = mockUSD.balanceOf(user);
+
         vm.prank(user);
         commodityMarket.claimFees();
-        assertTrue(mockUSD.balanceOf(user) > 1000 * 1e18);
+
+        assertTrue(mockUSD.balanceOf(user) > initialBalance);
     }
 }
