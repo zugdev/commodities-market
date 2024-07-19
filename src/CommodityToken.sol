@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract CommodityToken is ERC20, Ownable {
     uint8 public taskType; // Commodity type (e.g., 1 for Gold)
 
-    constructor(string memory name, string memory symbol, uint8 _taskType) ERC20(name, symbol) {
+    constructor(string memory name, string memory symbol, uint8 _taskType) ERC20(name, symbol) Ownable(msg.sender) {
         taskType = _taskType;
     }
 
