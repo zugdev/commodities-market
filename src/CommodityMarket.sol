@@ -53,7 +53,7 @@ contract CommodityMarket is Ownable {
         token.mint(to, amount);
     }
 
-    function burnCommodity(uint8 taskType, address from, uint256 amount) external onlyOwner {
+    function burnCommodity(uint8 taskType, address from, uint256 amount) external {
         CommodityToken token = commodityTokens[taskType];
         require(address(token) != address(0), "Commodity token does not exist");
 
@@ -76,9 +76,14 @@ contract CommodityMarket is Ownable {
 
     function getLatestPrice(uint8 taskType) public view returns (uint256 price) {
         (bytes memory result, , , , ) = priceFeed.latestRoundData(taskType);
-        price = abi.decode(result, (uint256));
+        price = bytesToUint(result); //truncates >32bytes ...
+    }  
+    
+    function bytesToUint(bytes memory b) internal pure virtual returns (uint256) {
+        require(b.length <= 32, "Bytes length exceeds 32.");
+        return abi.decode(abi.encodePacked(new bytes(32 - b.length), b), (uint256));
     }
-
+    
     function setMintingFee(uint256 newFee) external onlyOwner {
         mintingFee = newFee;
     }
